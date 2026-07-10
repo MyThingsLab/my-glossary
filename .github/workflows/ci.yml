@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["**.md", "docs/**", "dev-ledger/**"]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore: ["**.md", "docs/**", "dev-ledger/**"]
+
+# Supersede in-flight runs when an agent pushes again to the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    # Skip while a PR is a draft; always run on pushes to main.
+    if: ${{ github.event_name == 'push' || github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Full history so the secret-scan diff range below can resolve both
+          # the PR's base and head SHAs -- a shallow (default) clone wouldn't
+          # have the base commit locally.
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      # my-things-core is a sibling repo, not on PyPI — pull it from the same owner.
+      - name: Install my-things-core
+        run: pip install "my-things-core @ git+https://github.com/${{ github.repository_owner }}/my-things-core@main"
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Ruff
+        run: ruff check src tests
+      - name: Tests
+        run: pytest --cov=myglossary --cov-report=xml
+      - name: Secret scan (added lines vs base)
+        if: github.event_name == 'pull_request'
+        run: |
+          python -m mythings._secrets scan-diff-range \
+            "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}"
+      - name: Secret scan (PR title + body)
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr view "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}" \
+            --json title,body --jq '.title + "\n" + .body' \
+            | python -m mythings._secrets scan-text
+      # Warn-only for now (continue-on-error) -- see my-things-core's
+      # docs/CONVENTIONS.md "Dependency-vulnerability scanning" for why.
+      - name: Dependency vulnerability scan (warn-only)
+        continue-on-error: true
+        run: |
+          pip install pip-audit
+          pip-audit
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: ${{ github.repository }}
