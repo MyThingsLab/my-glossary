@@ -7,7 +7,7 @@ from mythings.engine import ClaudeCLIEngine, Engine, NoopEngine
 from mythings.github import GitHub
 from mythings.ledger import Ledger
 
-from myglossary.glossary import Entry, define, load_corpus
+from myglossary.glossary import Entry, define, load_corpus, resolve_extractor
 from myglossary.tool import BACKLOG_LABEL, Result, Tool
 
 
@@ -56,6 +56,12 @@ def main(argv: list[str] | None = None, *, tool_factory: type[Tool] = Tool) -> i
     )
     define_p.add_argument("--top", type=int, default=8, help="excerpts to shortlist")
     define_p.add_argument("--engine", choices=("noop", "claude"), default="noop")
+    define_p.add_argument(
+        "--cache",
+        type=Path,
+        help="cache extracted PDF text under this directory; re-defining a term against the "
+        "same books then skips re-extraction (seconds -> instant). Safe to reuse across runs.",
+    )
 
     # The write path: one labeled issue -> one glossary entry -> a draft PR.
     build = sub.add_parser("build", help="turn one labeled issue into a glossary entry PR")
@@ -73,11 +79,16 @@ def main(argv: list[str] | None = None, *, tool_factory: type[Tool] = Tool) -> i
         default="noop",
         help="noop replies with a fixed empty string (zero tokens); claude shells out to the CLI",
     )
+    build.add_argument(
+        "--cache",
+        type=Path,
+        help="cache extracted PDF text under this directory (see `define --cache`)",
+    )
 
     args = parser.parse_args(argv)
 
     if args.cmd == "define":
-        documents, chunks = load_corpus(args.corpus)
+        documents, chunks = load_corpus(args.corpus, extractor=resolve_extractor(args.cache))
         if not documents:
             print("no corpus files found")
             return 1
@@ -94,6 +105,7 @@ def main(argv: list[str] | None = None, *, tool_factory: type[Tool] = Tool) -> i
         label=args.label,
         corpus=args.corpus,
         top=args.top,
+        cache=args.cache,
     )
     result = tool.run(issue_number=args.issue)
     print(_render(result))

@@ -122,6 +122,40 @@ def test_define_reports_an_empty_corpus(tmp_path: Path, capsys: pytest.CaptureFi
     assert "no corpus files found" in capsys.readouterr().out
 
 
+def test_define_cache_flag_populates_and_reuses_the_cache_dir(
+    corpus: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    cache = corpus / "cache"
+    for _ in range(2):
+        assert (
+            main(
+                [
+                    "define",
+                    "overfitting",
+                    "--corpus",
+                    str(corpus / "notes.md"),
+                    "--cache",
+                    str(cache),
+                ]
+            )
+            == 0
+        )
+    # One source file -> exactly one cache entry, still there after the second run.
+    assert [p.suffix for p in cache.iterdir()] == [".txt"]
+
+
+def test_build_forwards_the_cache_dir_to_the_tool(corpus: Path) -> None:
+    cache = corpus / "cache"
+    main(["build", "--corpus", str(corpus), "--cache", str(cache)], tool_factory=SpyTool)
+    (tool,) = SpyTool.instances
+    assert tool.kwargs["cache"] == cache
+
+
+def test_define_without_cache_touches_no_cache_dir(corpus: Path) -> None:
+    assert main(["define", "overfitting", "--corpus", str(corpus / "notes.md")]) == 0
+    assert not (corpus / "cache").exists()
+
+
 def test_an_unknown_command_is_rejected() -> None:
     with pytest.raises(SystemExit):
         main(["frobnicate"])

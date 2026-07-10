@@ -5,7 +5,18 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-from mythings.corpus import Chunk, Citation, Document, chunk, cite, ingest, shortlist
+from mythings.corpus import (
+    Chunk,
+    Citation,
+    Document,
+    Extractor,
+    cached_extractor,
+    chunk,
+    cite,
+    extract,
+    ingest,
+    shortlist,
+)
 from mythings.engine import Engine, EngineRequest
 
 # Text extensions the corpus loader will read directly; PDFs go through
@@ -42,11 +53,22 @@ def corpus_files(paths: Iterable[Path]) -> list[Path]:
 
 
 def load_corpus(
-    paths: Iterable[Path], *, target_chars: int = 1200
+    paths: Iterable[Path],
+    *,
+    target_chars: int = 1200,
+    extractor: Extractor = extract,
 ) -> tuple[list[Document], list[Chunk]]:
-    documents = ingest(corpus_files(paths))
+    documents = ingest(corpus_files(paths), extractor=extractor)
     chunks = [c for doc in documents for c in chunk(doc, target_chars=target_chars)]
     return documents, chunks
+
+
+def resolve_extractor(cache_dir: Path | None) -> Extractor:
+    # A None cache dir means "extract every time" -- the fleet-loop default,
+    # where a build runs once per issue and a cache would only accumulate stale
+    # entries. A path opts into the disk cache, which is the interactive
+    # `define`-per-term win (~27s -> 0.02s on a real book shelf).
+    return extract if cache_dir is None else cached_extractor(cache_dir)
 
 
 def format_excerpts(chunks: Iterable[Chunk], documents: Iterable[Document]) -> str:
