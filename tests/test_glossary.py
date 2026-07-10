@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from mythings.corpus import Chunk, Document
+from mythings.corpus import Chunk, Document, extract
 from mythings.engine import EngineResult, NoopEngine
 
 from myglossary.glossary import (
@@ -14,6 +14,7 @@ from myglossary.glossary import (
     load_corpus,
     parse_definition,
     render_markdown,
+    resolve_extractor,
     select,
     slug,
 )
@@ -46,6 +47,24 @@ def test_corpus_files_picks_up_pdfs_and_text_and_ignores_the_rest(tmp_path: Path
     (tmp_path / "sub" / "d.txt").write_text("y")
 
     assert [p.name for p in corpus_files([tmp_path])] == ["a.md", "b.pdf", "d.txt"]
+
+
+def test_resolve_extractor_none_is_the_plain_extractor() -> None:
+    assert resolve_extractor(None) is extract
+
+
+def test_resolve_extractor_with_a_dir_caches(tmp_path: Path) -> None:
+    src = tmp_path / "a.txt"
+    src.write_text("body")
+    ex = resolve_extractor(tmp_path / "cache")
+    assert ex(src) == "body"
+    assert (tmp_path / "cache").is_dir()
+
+
+def test_load_corpus_passes_the_extractor_through(tmp_path: Path) -> None:
+    (tmp_path / "a.md").write_text("ignored on disk")
+    docs, _ = load_corpus([tmp_path], extractor=lambda p: "injected")
+    assert docs[0].text == "injected"
 
 
 def test_load_corpus_chunks_every_document(tmp_path: Path) -> None:

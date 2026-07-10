@@ -19,6 +19,7 @@ from myglossary.glossary import (
     format_excerpts,
     load_corpus,
     render_markdown,
+    resolve_extractor,
     select,
     slug,
 )
@@ -75,6 +76,7 @@ class Tool:
         corpus: Sequence[Path] = (),
         top: int = 8,
         entries_dir: str = "glossary",
+        cache: Path | None = None,
     ) -> None:
         self.repo = Path(repo)
         self.ledger = ledger
@@ -87,6 +89,7 @@ class Tool:
         self.corpus = list(corpus)
         self.top = top
         self.entries_dir = entries_dir
+        self._extractor = resolve_extractor(cache)
         # prework() selects the excerpts; apply() must cite exactly those and no
         # others. The template's seam signatures carry only the Engine reply
         # between them, so the selection is held here across the one call.
@@ -98,7 +101,7 @@ class Tool:
     def prework(self, issue: Issue) -> str:
         # Deterministic pre-work: load the corpus and shortlist the excerpts
         # for the term. No judgment here -- token overlap, not a model.
-        self._documents, chunks = load_corpus(self.corpus)
+        self._documents, chunks = load_corpus(self.corpus, extractor=self._extractor)
         self._selected = select(issue.title, chunks, top=self.top)
         return format_excerpts(self._selected, self._documents)
 
