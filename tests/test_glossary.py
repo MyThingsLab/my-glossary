@@ -4,7 +4,8 @@ from pathlib import Path
 
 import pytest
 from mythings.corpus import Chunk, Document, extract
-from mythings.engine import EngineResult, NoopEngine
+from mythings.engine import NoopEngine
+from mythings.testing import ScriptedEngine
 
 from myglossary.glossary import (
     corpus_files,
@@ -26,17 +27,6 @@ def _chunk(doc_id: str = "d", ordinal: int = 0, text: str = "body") -> Chunk:
 
 def _doc(doc_id: str = "d", title: str = "Doc", text: str = "body") -> Document:
     return Document(id=doc_id, path=f"/{doc_id}.md", title=title, text=text)
-
-
-class ScriptedEngine:
-    def __init__(self, reply: str) -> None:
-        self.reply = reply
-        self.calls = 0
-
-    def run(self, request) -> EngineResult:
-        self.calls += 1
-        self.request = request
-        return EngineResult(text=self.reply)
 
 
 def test_corpus_files_picks_up_pdfs_and_text_and_ignores_the_rest(tmp_path: Path) -> None:
@@ -114,7 +104,7 @@ def test_define_makes_exactly_one_engine_call() -> None:
     engine = ScriptedEngine("A definition [d:0].")
     doc = _doc(text="body")
     entry, selected = define("term", [doc], [_chunk()], engine)
-    assert engine.calls == 1
+    assert len(engine.calls) == 1
     assert entry.definition == "A definition [d:0]."
     assert len(selected) == 1
 
@@ -122,7 +112,7 @@ def test_define_makes_exactly_one_engine_call() -> None:
 def test_define_on_an_empty_corpus_makes_no_engine_call() -> None:
     engine = ScriptedEngine("should not be called")
     entry, selected = define("term", [], [], engine)
-    assert engine.calls == 0
+    assert engine.calls == []
     assert entry.is_degraded()
     assert selected == []
 
@@ -133,8 +123,8 @@ def test_define_shows_the_engine_only_the_shortlisted_excerpts() -> None:
     hit = _chunk(ordinal=0, text="the EM algorithm maximises likelihood")
     miss = _chunk(ordinal=1, text="kittens are unrelated")
     define("EM algorithm", [doc], [miss, hit], engine, top=1)
-    assert "EM algorithm maximises" in engine.request.prompt
-    assert "kittens" not in engine.request.prompt
+    assert "EM algorithm maximises" in engine.calls[-1].prompt
+    assert "kittens" not in engine.calls[-1].prompt
 
 
 def test_noop_engine_never_fabricates_a_definition() -> None:
