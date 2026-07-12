@@ -1,0 +1,1 @@
+{"data":{"files":"tests/","session":"2026-07-12"},"detail":"Mechanical migration to mythings.testing: inline engine spy replaced by the shared ScriptedEngine (attribute/counter shims folded into the assertions or a local scripted() payload factory).","kind":"build","outcome":"success","tool":"claude-code","ts":"2026-07-12T10:20:33Z"}
