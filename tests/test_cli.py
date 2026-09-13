@@ -80,11 +80,10 @@ def test_denied_build_exits_nonzero(corpus: Path) -> None:
 def test_define_prints_the_definition_and_its_sources(
     corpus: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    class Fake:
-        def run(self, request):
-            return EngineResult(text="Memorising the training set [notes:0].")
+    from mythings.testing import ScriptedEngine
 
-    monkeypatch.setattr("myglossary.cli._engine", lambda name: Fake())
+    engine = ScriptedEngine(reply="Memorising the training set [notes:0].")
+    monkeypatch.setattr("myglossary.cli._engine", lambda name: engine)
     rc = main(["define", "overfitting", "--corpus", str(corpus)])
     out = capsys.readouterr().out
 
