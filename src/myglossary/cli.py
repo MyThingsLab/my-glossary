@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from mythings.engine import ClaudeCLIEngine, Engine, NoopEngine
+from mythings.engine import build_engine_from_args
 from mythings.github import GitHub
 from mythings.ledger import Ledger
 
@@ -31,10 +31,6 @@ def _render_entry(entry: Entry) -> str:
         # Loud on purpose: the Engine cited an excerpt it was never shown.
         lines += ["", f"WARNING: fabricated citations ignored: {', '.join(entry.unknown_markers)}"]
     return "\n".join(lines)
-
-
-def _engine(name: str) -> Engine:
-    return NoopEngine() if name == "noop" else ClaudeCLIEngine()
 
 
 def main(argv: list[str] | None = None, *, tool_factory: type[Tool] = Tool) -> int:
@@ -92,7 +88,7 @@ def main(argv: list[str] | None = None, *, tool_factory: type[Tool] = Tool) -> i
         if not documents:
             print("no corpus files found")
             return 1
-        entry, _ = define(args.term, documents, chunks, _engine(args.engine), top=args.top)
+        entry, _ = define(args.term, documents, chunks, build_engine_from_args(args), top=args.top)
         print(_render_entry(entry))
         return 0
 
@@ -100,7 +96,7 @@ def main(argv: list[str] | None = None, *, tool_factory: type[Tool] = Tool) -> i
         repo=args.source,
         ledger=Ledger(args.ledger),
         github=GitHub(args.repo),
-        engine=_engine(args.engine),
+        engine=build_engine_from_args(args),
         base=args.base,
         label=args.label,
         corpus=args.corpus,

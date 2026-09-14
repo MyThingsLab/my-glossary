@@ -84,7 +84,7 @@ def test_define_prints_the_definition_and_its_sources(
         def run(self, request):
             return EngineResult(text="Memorising the training set [notes:0].")
 
-    monkeypatch.setattr("myglossary.cli._engine", lambda name: Fake())
+    monkeypatch.setattr("myglossary.cli.build_engine_from_args", lambda args: Fake())
     rc = main(["define", "overfitting", "--corpus", str(corpus)])
     out = capsys.readouterr().out
 
@@ -111,7 +111,7 @@ def test_define_warns_loudly_about_a_fabricated_citation(
         def run(self, request):
             return EngineResult(text="Overfitting is bad [bishop-prml:99].")
 
-    monkeypatch.setattr("myglossary.cli._engine", lambda name: Liar())
+    monkeypatch.setattr("myglossary.cli.build_engine_from_args", lambda args: Liar())
     main(["define", "overfitting", "--corpus", str(corpus)])
     out = capsys.readouterr().out
     assert "fabricated citations ignored: [bishop-prml:99]" in out
